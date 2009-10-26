@@ -1,0 +1,82 @@
+<?xml version="1.0" encoding="utf-8"?>
+<mx:TitleWindow xmlns:mx="http://www.adobe.com/2006/mxml"
+                title="Grammatik oeffnen"
+                layout="vertical"
+                width="480"
+                height="320"
+                showCloseButton="true"
+                close="close(event)"
+                creationComplete='init()' xmlns:ns1="controls.*">
+
+  <mx:Script>
+    <![CDATA[
+
+  import vfeditor.Adapter;
+  
+  import mx.controls.Alert;
+  import mx.events.CloseEvent;
+  import mx.managers.PopUpManager;
+  
+  import mx.rpc.events.ResultEvent;
+  import mx.rpc.events.FaultEvent;
+  
+  private var progressIndicator:ModalProgress = new ModalProgress();
+  
+  private var _result:int;
+  
+  public function get result():int {
+    return _result;
+  }
+  
+  private function indicateProgress(value:Boolean):void {
+    spinner.visible = value;
+  }
+  
+  private function init():void {
+    indicateProgress(true);
+    Adapter.instance().myGrammars(function(xml:XML):void {
+      list.dataProvider = xml.elements('grammar');
+      indicateProgress(false);
+    }, function(xml:XML):void {
+      indicateProgress(false);
+      Alert.show('error');
+    });
+  }
+  
+  private function close(evt:CloseEvent):void {
+    PopUpManager.removePopUp(this);
+  }
+  
+  private function open():void {
+    _result = list.selectedItem.id;
+    this.dispatchEvent(new CloseEvent(CloseEvent.CLOSE));
+    PopUpManager.removePopUp(this);
+  }
+  
+  // private function srvMyGrammarsResult(event:ResultEvent):void {
+  //var xmlData:XML = new XML(event.result);
+  //list.dataProvider = xmlData.elements('grammar');
+  //indicateProgress(false);
+  //}
+  //
+  //private function srvMyGrammarsFault(event:FaultEvent):void {
+  //indicateProgress(false);
+  //Alert.show(event.fault.faultString, "Error");
+  //}
+  
+  ]]>
+  </mx:Script>
+
+  <mx:DataGrid id='list' height='100%' width="100%" editable="false">
+    <mx:columns>
+      <mx:DataGridColumn headerText="Titel" dataField="title"/>
+      <mx:DataGridColumn headerText="Zeilen" dataField="lines"/>
+      <mx:DataGridColumn headerText="Zuletzt bearbeitet am" dataField="updated_at"/>
+    </mx:columns>
+  </mx:DataGrid>
+  <mx:HBox width="100%">
+    <mx:Button label="Oeffnen" click="open()"/>
+    <ns1:Spinner id="spinner" tickColor="#ff8000"/>
+  </mx:HBox>
+
+</mx:TitleWindow>

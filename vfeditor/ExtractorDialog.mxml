@@ -1,0 +1,205 @@
+<?xml version="1.0" encoding="utf-8"?>
+<mx:TitleWindow xmlns:mx="http://www.adobe.com/2006/mxml"
+                title="Ediths Extraktor"
+                layout="vertical"
+                width="800"
+                creationComplete="init()"
+                showCloseButton="true"
+                close="cancel(event)">
+
+  <mx:Script>
+    <![CDATA[
+
+  import vfeditor.Adapter;
+  import flash.events.TextEvent;
+  import mx.controls.Alert;
+  import mx.events.CloseEvent;
+  import mx.events.ListEvent;
+  import mx.managers.PopUpManager;
+  //import mx.collections.XMLListCollection;
+  
+  public var result:String = null;
+  
+  private var fragmentList:Array;
+  private var _firstFragment:String;
+  
+  private function init():void {
+    fragments.setFocus();
+    // TODO set cursor
+    fieldsForNewGroup();
+    getGroups();
+  }
+  
+  private function cancel(evt:CloseEvent):void {
+    PopUpManager.removePopUp(this);
+  }
+  
+  public function set initialFragment(fragment:String):void {
+    _firstFragment = fragment;
+    fragments.text = fragment + "\n";
+    fragments.setSelection(fragments.text.length, fragments.text.length);
+  }
+  
+  private function newFragment(event:TextEvent):void {
+    // Alert.show("hallo"); -- THAT KILLS FIREFOX!
+    if(event.text=="\n") {
+      getGroups();
+    }
+  }
+  
+  private function getFragmentList():Array {
+    return fragments.text.split("\r");
+  }
+  
+  private function getGroups():void {
+    // FIXME delete all blank lines
+    Adapter.instance().groupsForFragments(getFragmentList(),
+                                          requestedGroups,
+                                          function(xml:XML):void { }); // TODO disable progressor
+    // TODO enable progressor
+  }
+  
+  private function requestedGroups(xml:XML):void {
+    groups.dataProvider = xml.elements("group");
+    if(groups.dataProvider.length>0) {
+      useGroup.enabled = true;
+      useGroup.selected = true;
+      groups.selectedIndex = 0;
+      fieldsForUseGroup();
+    } else {
+      useGroup.enabled = false;
+      newGroup.selected = true;
+      fieldsForNewGroup();
+    }
+    // TODO disable progressor
+  }
+  
+  private function fieldsForNewGroup():void {
+    groupTitle.enabled = true;
+    groupKey.enabled = true;
+    groupDescription.enabled = true;
+    groupExtendable.enabled = true;
+    extend.enabled = false;
+    // -- deselect group
+    groups.selectedIndex = -1;
+    // -- prepopulate
+    groupTitle.text = _firstFragment + ", etc.";
+    groupKey.text = _firstFragment.toLowerCase().replace(/ /,"_");
+    groupDescription.text = "";
+    groupFragments.text = "(die eingegeben Fragmente)";
+    groupExtendable.selected = true;
+  }
+  
+  private function fieldsForUseGroup():void {
+    groupTitle.enabled = false;
+    groupKey.enabled = false;
+    groupDescription.enabled = false;
+    groupExtendable.enabled = false;
+    extend.enabled = true;
+    // -- select group
+    if(groups.selectedIndex<0) {
+      groups.selectedIndex = 0;
+    }
+    // -- populate with Groupinfo
+    groupTitle.text = groups.selectedItem.title;
+    groupKey.text = groups.selectedItem.key;
+    groupDescription.text = groups.selectedItem.description;
+    groupFragments.text = groups.selectedItem.fragmentsascsv;
+    groupExtendable.selected = groups.selectedItem.extendable;
+  }
+  
+  private function groupSelected(event:ListEvent):void {
+    useGroup.selected = true;
+    fieldsForUseGroup();
+  }
+  
+  // called when OK button is pressed
+  private function doYourStuff():void {
+    if(newGroup.selected) {
+      Adapter.instance().newGroupWithFragments(groupTitle.text,
+                                               groupKey.text,
+                                               groupDescription.text,
+                                               groupExtendable.selected,
+                                               getFragmentList(),
+                                               everythingWentFine,
+                                               somethingWentWrong);
+    } else {
+      var group:Object = groups.selectedItem;
+        if(extend.selected) {
+          if(group.extendable) {
+            Adapter.instance().extendGroupWithFragments(group.id,
+                                                        getFragmentList(),
+                                                        everythingWentFine,
+                                                        somethingWentWrong);
+          } else {
+            // group doesn't allow to be extended
+          }
+        } else {
+          close();
+        }
+     }
+  }
+  
+  private function everythingWentFine(xml:XML):void {
+    close();
+  }
+  
+  private function somethingWentWrong(xml:XML):void {
+  }
+  
+  private function close():void {
+    result = groupKey.text;
+    this.dispatchEvent(new CloseEvent(CloseEvent.CLOSE));
+    PopUpManager.removePopUp(this);
+  }
+  
+  ]]>
+  </mx:Script>
+
+  <mx:VBox height="100%" width="100%">
+    <mx:HBox width="100%">
+      <mx:VBox width="25%" height="100%" horizontalAlign="center">
+        <mx:Label text="Fragmente" textAlign="left" fontWeight="bold"/>
+        <mx:TextArea id="fragments" textInput="newFragment(event)" width="100%" height="100%"/>
+      </mx:VBox>
+      <mx:VBox width="100%" height="100%" horizontalAlign="center">
+        <mx:Label text="Gruppen" fontWeight="bold" textAlign="left"/>
+        <mx:DataGrid id="groups" width="100%" height="100%" editable="false" change="groupSelected(event)">
+          <mx:columns>
+            <mx:DataGridColumn headerText="Id" dataField="id" visible="false" />
+            <mx:DataGridColumn headerText="Rang" dataField="rank" width="50" textAlign="center" />
+            <mx:DataGridColumn headerText="Schluessel &lt;...&gt;" dataField="key" width="100"/>
+            <mx:DataGridColumn headerText="Titel" dataField="title" width="100" />
+            <mx:DataGridColumn headerText="Beschreibung" dataField="description" visible="false" />
+            <mx:DataGridColumn headerText="Fragmente" dataField="fragmentsascsv" />
+            <mx:DataGridColumn headerText="Erweiterbar" dataField="extendable" visible="false" />
+          </mx:columns>
+        </mx:DataGrid>
+      </mx:VBox>
+    </mx:HBox>
+    <mx:HBox width="100%" horizontalAlign="center" verticalAlign="middle">
+      <mx:RadioButtonGroup id="method" />
+      <mx:RadioButton groupName="method" id="newGroup" selected="true" label="Neue Gruppe anlegen" change="fieldsForNewGroup()" />
+      <mx:Label text="oder" textAlign="left" fontWeight="bold" />
+      <mx:RadioButton groupName="method" id="useGroup" label="Ausgewaehlte Gruppe verwenden" change="fieldsForUseGroup()" />
+      <mx:Label text="und" textAlign="left" fontWeight="bold" />
+      <mx:CheckBox id="extend" selected="true" label="erweitern" />
+    </mx:HBox>
+    <mx:HBox width="100%" horizontalAlign="center" verticalAlign="top">
+      <mx:Form width="100%">
+        <mx:FormItem label="Titel" width="100%"><mx:TextInput id="groupTitle" width="100%" /></mx:FormItem>
+        <mx:FormItem label="Schluessel" width="100%"><mx:TextInput id="groupKey" width="100%" /></mx:FormItem>
+        <mx:FormItem label="Beschreibung" width="100%"><mx:TextArea id="groupDescription" width="100%" /></mx:FormItem>
+      </mx:Form>
+      <mx:VBox height="100%" width="100%">
+        <mx:Label text="Fragmente:" />
+        <mx:Text id="groupFragments" width="100%" height="100%" />
+        <mx:CheckBox id="groupExtendable" label="Gruppe ist erweiterbar" selected="true" />
+      </mx:VBox>
+    </mx:HBox>
+  </mx:VBox>
+  <mx:HBox width="100%" horizontalAlign="right">
+    <mx:Button label="So soll es sein!" click="doYourStuff()"/>
+  </mx:HBox>
+
+</mx:TitleWindow>

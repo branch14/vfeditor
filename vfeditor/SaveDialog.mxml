@@ -1,0 +1,37 @@
+<?xml version="1.0" encoding="utf-8"?>
+<mx:TitleWindow xmlns:mx="http://www.adobe.com/2006/mxml"
+                title="Grammatik speichern"
+                layout="vertical"
+                width="480"
+                height="320"
+                xmlns:ns1="controls.*">
+
+  <!--        showCloseButton="true"
+              close="close(event)"-->
+
+  <mx:Script>
+    <![CDATA[
+
+  import mx.events.CloseEvent;
+  import mx.managers.PopUpManager;
+  
+  private var _result:String;
+  
+  public function get result():String {
+    return _result;
+  }
+  
+  private function close():void {
+    _result = poemtitle.text;
+    this.dispatchEvent(new CloseEvent(CloseEvent.CLOSE));
+    PopUpManager.removePopUp(this);
+  }
+
+    ]]>
+  </mx:Script>
+
+  <mx:Label text="Titel der Grammatik?" />
+  <mx:TextInput id="poemtitle" width="100%" />
+  <mx:Button label="Speichern" click="close()" />
+
+</mx:TitleWindow>

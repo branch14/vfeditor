@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<mx:TitleWindow xmlns:mx="http://www.adobe.com/2006/mxml"
+        title="Einen Moment bitte..."
+        layout="vertical"
+        width="320"
+        height="210">
+	
+	<mx:VideoDisplay width="100%" height="100%" autoPlay="true" source="curtainLoop.flv"/>
+
+</mx:TitleWindow>

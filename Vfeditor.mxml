@@ -1,0 +1,213 @@
+<?xml version="1.0" encoding="utf-8"?>
+<mx:Application xmlns:mx="http://www.adobe.com/2006/mxml" xmlns:vxs='de.versfabrik.vxs.*' backgroundColor="#C0C0C0" applicationComplete='init()'>
+
+  <mx:Script>
+
+    <![CDATA[
+
+  import vfeditor.Editor;
+  import vfeditor.Adapter;
+  import vfeditor.SaveDialog;
+  import vfeditor.ExtractorDialog;
+  import vfeditor.OpenDialog;
+  import vfeditor.NewGroupDialog;
+  import vfeditor.PreferencesDialog;
+  import vfeditor.ModalProgress;
+  
+  import mx.events.CloseEvent;
+  import mx.containers.Panel;
+  import mx.controls.TextArea;
+  import mx.rpc.events.ResultEvent;
+  import mx.rpc.events.FaultEvent;
+  
+  import mx.utils.ArrayUtil;
+  import mx.events.ItemClickEvent;
+  import mx.controls.Alert;
+  import mx.containers.TitleWindow;
+  import mx.managers.PopUpManager;
+  
+  private var preferencesDialog:TitleWindow;
+  private var openDialog:TitleWindow;
+  private var saveDialog:TitleWindow;
+  private var extractorDialog:TitleWindow;
+  private var config:Object = new Object();
+  private var adapter:Adapter;
+  
+  private function init():void {
+    progressBar.visible = false;
+    newEditor();
+    config['vxs.url'] = 'http://phil:secret@localhost:3000/adapter';
+    adapter = Adapter.instance({baseUrl: config['vxs.url']});
+  }
+  
+  //private function onConfigLoad(event:Event):void {
+  //_config = YAML.decode(event.target.data) as HashMap;
+  //}
+  
+  private function indicateProgress(value:Boolean):void {
+    progressBar.visible = value;
+  }
+  
+  // GET /my_grammars
+  // GET /load_grammar/:id
+  // POST /save_grammar/:id
+  // GET /generate/:id
+  // POST /new_group_with_fragments
+  // POST /extend_group_with_fragments
+  // POST /groups_for_fragments
+  // GET /validate_uniqeness_of_group_key/:id
+  // GET /fragments_from/:id
+  
+  private function itemClickHandler(event:ItemClickEvent):void {
+    switch(event.label) {
+      case 'Einstellungen':
+        popUpPreferencesDialog();
+        break;
+      case 'Neu':
+        newEditor();
+        break;
+      case 'Oeffnen':
+        popUpOpenDialog();
+        break;
+      case 'Speichern':
+        save();
+        break;
+      case 'Extrahieren':
+        var frag:String = currentEditor().selection;
+        if(frag.length==0) {
+          Alert.show("Zuerst ein Fragment markieren!");
+        } else {
+          if(frag.indexOf("<")!=frag.indexOf(">")) {
+            Alert.show("Hoppla! Versuchen wir ein Symbol zu extrahieren?");
+          } else {
+            popUpExtractorDialog();
+          }
+        }
+        break;
+      case 'Generieren':
+        generate();
+        break;
+    }
+  }
+  
+  private function currentEditor():Editor {
+    return tabnav.selectedChild as Editor;
+  }
+  
+  private function popUpPreferencesDialog():void {
+    preferencesDialog = PopUpManager.createPopUp(this, PreferencesDialog, true) as TitleWindow;
+    PopUpManager.centerPopUp(preferencesDialog);
+  }
+
+  private function newEditor(id:int=0, title:String='Unbenannt', content:String=''):void {
+    var e:Editor = new Editor(id, title, content);
+    tabnav.addChild(e);
+    tabnav.selectedChild = e;
+  }
+  
+  private function popUpOpenDialog():void {
+    openDialog = PopUpManager.createPopUp(this, OpenDialog, true) as OpenDialog;
+    openDialog.addEventListener(CloseEvent.CLOSE, openDialogClosed);
+    PopUpManager.centerPopUp(openDialog);
+  }
+  
+  private function openDialogClosed(event:Event):void {
+    var id:int = (event.target as OpenDialog).result;
+    //Alert.show(""+id, "Loading...");
+    adapter.loadGrammar(id, function(xml:XML):void {
+      newEditor(xml.id, xml.title, xml.content);
+      }, function(xml:XML):void {
+        Alert.show('error');
+      });
+  }
+  
+  private function save(onSaved:Function = null):void {
+    var e:Editor = currentEditor();
+    //Alert.show(''+e.gid);
+    if(e.gid==0) {
+      popUpSaveDialog();
+    } else {
+      adapter.saveGrammar(e.gid, e.title, e.content,
+        function(xml:XML):void {
+          if(onSaved!=null) {
+            onSaved();
+          }
+        }, // TODO Disable Save Button
+        function(xml:XML):void { Alert.show(xml); });
+    }
+  }
+  
+  private function popUpSaveDialog():void {
+    saveDialog = PopUpManager.createPopUp(this, SaveDialog, true) as SaveDialog;
+    saveDialog.addEventListener(CloseEvent.CLOSE, saveDialogClosed);
+    PopUpManager.centerPopUp(saveDialog);
+  }
+  
+  private function saveDialogClosed(event:Event):void {
+    var e:Editor = currentEditor();
+    e.title = (event.target as SaveDialog).result;
+    adapter.saveGrammar(0, e.title, e.content,
+      function(xml:XML):void { e.gid = int(xml); }, // TODO Disable Save Button
+      function(xml:XML):void { Alert.show(xml); });
+  }
+  
+  private function popUpExtractorDialog():void {
+    extractorDialog = PopUpManager.createPopUp(this, ExtractorDialog, true) as ExtractorDialog;
+    extractorDialog.addEventListener(CloseEvent.CLOSE, extractorDialogClosed);
+    (extractorDialog as ExtractorDialog).initialFragment = currentEditor().selection;
+    PopUpManager.centerPopUp(extractorDialog);
+  }
+  
+  private function extractorDialogClosed(event:Event):void {
+    var symbol:String = (event.target as ExtractorDialog).result;
+    var e:Editor = currentEditor();
+    if(symbol) {
+      e.replaceSelection('<'+symbol+'>');
+    }
+    e.focus();
+  }
+  
+  private function generate():void {
+    save(function ():void {
+      var e:Editor = currentEditor();
+      adapter.generate(e.gid,
+        function(xml:XML):void { poem.text = xml.poem; },
+        function(xml:XML):void { Alert.show(xml); });
+      });
+  }
+
+]]>
+  </mx:Script>
+
+  <mx:VBox height="100%" width='100%'>
+    <!--<mx:MenuBar labelField="@label" dataProvider="{menuData}" itemClick="menuBarClickHandler(event)" />-->
+    <mx:ButtonBar itemClick="itemClickHandler(event)">
+      <mx:dataProvider>
+        <mx:String>Neu</mx:String>
+        <mx:String>Oeffnen</mx:String>
+        <mx:String>Speichern</mx:String>
+        <mx:String>Extrahieren</mx:String>
+        <!--<mx:String>Scan</mx:String>-->
+        <mx:String>Generieren</mx:String>
+      </mx:dataProvider>
+    </mx:ButtonBar>
+    <mx:HDividedBox width="100%" height="100%">
+      <mx:VDividedBox width="100%" height="100%">
+        <mx:TabNavigator id='tabnav' width="100%" height="100%" />
+        <mx:Panel width="100%" height="50%" title="Ausgabe">
+          <mx:Text id="poem" text="Some Text" width="100%" height="100%"/>
+        </mx:Panel>
+      </mx:VDividedBox>
+      <!--
+          <mx:Panel width="50%" height="100%" title="Chat">
+          </mx:Panel>
+          -->
+    </mx:HDividedBox>
+    <mx:ApplicationControlBar width="100%" horizontalAlign="right">
+      <mx:ProgressBar labelPlacement="center" enabled="false" id="progressBar"/>
+    </mx:ApplicationControlBar>
+  </mx:VBox>
+
+  <mx:Style source="vfeditor.css"/>
+
+</mx:Application>
