@@ -5,6 +5,11 @@
 
     <![CDATA[
 
+  import flash.external.ExternalInterface;
+  public static function trace(str:String):void {
+    ExternalInterface.call( "console.log", str);
+  }
+
   import vfeditor.Editor;
   import vfeditor.Adapter;
   import vfeditor.SaveDialog;
@@ -19,13 +24,14 @@
   import mx.controls.TextArea;
   import mx.rpc.events.ResultEvent;
   import mx.rpc.events.FaultEvent;
-  
   import mx.utils.ArrayUtil;
   import mx.events.ItemClickEvent;
   import mx.controls.Alert;
   import mx.containers.TitleWindow;
   import mx.managers.PopUpManager;
-  
+
+  import mx.utils.URLUtil;
+
   private var preferencesDialog:TitleWindow;
   private var openDialog:TitleWindow;
   private var saveDialog:TitleWindow;
@@ -36,13 +42,13 @@
   private function init():void {
     progressBar.visible = false;
     newEditor();
-    config['vxs.url'] = 'http://phil:secret@localhost:3000/adapter';
-    adapter = Adapter.instance({baseUrl: config['vxs.url']});
+    config.credentials = Application.application.parameters.credentials;
+    config.path = Application.application.parameters.path;
+    config.server = URLUtil.getServerNameWithPort(Application.application.url);
+    // config.baseUrl = "http://"+config.server+"/"+config.path;
+    config.baseUrl = config.path;
+    adapter = Adapter.instance(config);
   }
-  
-  //private function onConfigLoad(event:Event):void {
-  //_config = YAML.decode(event.target.data) as HashMap;
-  //}
   
   private function indicateProgress(value:Boolean):void {
     progressBar.visible = value;
